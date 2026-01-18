@@ -1,0 +1,40 @@
+seed: 0
+
+train:
+  total_timesteps: 3000000
+  log_interval: 10
+  save_freq_steps: 200000
+  save_dir: models
+  tb_log_dir: runs
+  progress_bar: True
+
+env:
+  episode_seconds: 10.0
+  control_dt: 0.02
+  sim_dt: 0.002
+
+  # initial termination thresholds (already tuned)
+  min_pelvis_height: 0.70
+  max_roll_pitch_deg: 45.0
+  max_torso_angvel_term: 10.0
+
+  # action mapping
+  action_scale_rad: 0.25
+  action_rate_limit: 0.15
+
+ppo:
+  policy: MlpPolicy
+  n_steps: 4096
+  batch_size: 512
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  learning_rate: 3.0e-4
+  verbose: 1
+
+policy_kwargs:
+  net_arch: [256, 256]

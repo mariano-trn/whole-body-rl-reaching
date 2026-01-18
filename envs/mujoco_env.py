@@ -2,13 +2,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import gymnasium as gym
 
 import mujoco
+
+from envs.rewards import RewardWeights, compute_reward
 
 
 @dataclass
@@ -43,6 +45,12 @@ class EnvConfig:
 
     # Observation features
     include_prev_action: bool = True
+
+    # Reward weights
+    reward: RewardWeights = field(default_factory=RewardWeights)
+
+    # Curriculum stage identifier (for logging/debug only)
+    stage_name: str = "stage0"
 
 
 class WholeBodyReachEnv(gym.Env):
@@ -179,6 +187,8 @@ class WholeBodyReachEnv(gym.Env):
             "target_xyz": self.target_xyz.copy(),
             "q_nominal": self.q_nominal.copy(),
         }
+
+        self._prev_ee_pos = self.data.site_xpos[self.site_ee_id].copy()
         return obs, info
 
     def step(self, action: np.ndarray):
@@ -213,7 +223,32 @@ class WholeBodyReachEnv(gym.Env):
         # You can start with a simple dense reaching reward to validate dynamics:
         ee_pos = self.data.site_xpos[self.site_ee_id].copy()
         dist = float(np.linalg.norm(ee_pos - self.target_xyz))
-        reward = -dist
+
+        # torso roll/pitch
+        R = self.data.xmat[self.body_torso_id].reshape(3, 3)
+        roll = float(np.arctan2(R[2, 1], R[2, 2]))
+        pitch = float(-np.arcsin(np.clip(R[2, 0], -1.0, 1.0)))
+
+        # end-effector linear velocity (approx via finite diff on position across control steps)
+        # simplest: cache previous ee_pos
+        if not hasattr(self, "_prev_ee_pos"):
+            self._prev_ee_pos = ee_pos.copy()
+        ee_linvel = (ee_pos - self._prev_ee_pos) / self.cfg.control_dt
+        self._prev_ee_pos = ee_pos.copy()
+
+        # alive = not terminated (note: terminated computed earlier)
+        alive = not terminated
+
+        reward, reward_terms = compute_reward(
+            dist_to_target=dist,
+            ee_linvel=ee_linvel,
+            roll_rad=roll,
+            pitch_rad=pitch,
+            action=a,
+            prev_action=self.prev_action,
+            alive=alive,
+            weights=self.cfg.reward,
+        )
 
         # 7) obs + info
         obs = self._build_obs(prev_action=a)
@@ -221,6 +256,7 @@ class WholeBodyReachEnv(gym.Env):
             "dist_to_target": dist,
             "success": success,
             "step": self.step_count,
+            "reward_terms": reward_terms,
 
             # --- debug termination ---
             "term_counts": self.term_counts.copy(),
@@ -343,13 +379,13 @@ class WholeBodyReachEnv(gym.Env):
         angvel_bad = angvel_norm > self.cfg.max_torso_angvel_term
         joint_limit = self._any_joint_limit_violated()
         nonfoot_contact = self._any_nonfoot_ground_contact()
-        self.last_violations = {
+        self.last_violations = {k: bool(v) for k, v in {
             "fall": fall,
             "tilt": tilt,
             "angvel": angvel_bad,
             "joint_limit": joint_limit,
             "nonfoot_contact": nonfoot_contact,
-        }
+        }.items()}
 
         # --- persistence counters ---
         self._update_term_counter("fall", fall)
@@ -462,6 +498,15 @@ class WholeBodyReachEnv(gym.Env):
                     l = 1.0
         return r, l
 
+    def set_stage(self, *, target_x, target_y, target_z, reward_weights):
+        self.cfg.target_x = tuple(target_x)
+        self.cfg.target_y = tuple(target_y)
+        self.cfg.target_z = tuple(target_z)
+
+        # reward_weights is a dict matching RewardWeights fields
+        for k, v in reward_weights.items():
+            setattr(self.cfg.reward, k, float(v))
+
     def render(self):
         if self._renderer is None:
             raise RuntimeError("render_mode not enabled. Create env with render_mode='rgb_array' or 'human'.")
@@ -492,6 +537,9 @@ if __name__ == "__main__":
         if terminated or truncated:
             print("Ended:", {"terminated": terminated, "truncated": truncated, **info})
             break
+
+        if info["step"] % 50 == 0:
+            print(info["step"], info["reward_terms"])
 
     print("Final step:", info["step"])
     env.close()
