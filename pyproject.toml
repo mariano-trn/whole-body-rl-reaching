@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "wholebody-rl-reaching"
+version = "0.1.0"
+description = "Whole-body reinforcement learning for mobile reaching in MuJoCo"
+readme = "README.txt"
+requires-python = ">=3.10"
+
+authors = [
+    { name = "Mariano Tornabene", email = "marianotornabene93@gmail.com" }
+]
+
+# SPDX string (evita warning)
+license = "MIT"
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "mujoco>=2.3.7",
+    "gymnasium>=0.29",
+    "stable-baselines3>=2.2.1",
+    "torch>=2.0",
+    "tensorboard>=2.14",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+]
+
+keywords = ["reinforcement-learning", "mujoco", "humanoid", "whole-body-control", "ppo"]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.1",
+    "isort>=5.13",
+    "ruff>=0.2",
+    "pytest>=7.4",
+]
+video = [
+    "imageio>=2.31",
+    "imageio-ffmpeg>=0.4",
+]
+
+
+# ---- IMPORTANT: explicit package discovery ----
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["envs*"]
+exclude = ["logs*", "assets*", "models*", "configs*", "docs*"]
+
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
