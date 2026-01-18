@@ -1,6 +1,7 @@
 # envs/mujoco_env.py
 from __future__ import annotations
 
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
@@ -464,7 +465,7 @@ class WholeBodyReachEnv(gym.Env):
     def render(self):
         if self._renderer is None:
             raise RuntimeError("render_mode not enabled. Create env with render_mode='rgb_array' or 'human'.")
-        self._renderer.update_scene(self.data, camera=None)
+        self._renderer.update_scene(self.data, camera=-1)
         img = self._renderer.render()
         if self.render_mode == "human":
             # Minimal: return image; you can integrate with a window if you want.
@@ -479,7 +480,7 @@ class WholeBodyReachEnv(gym.Env):
 
 if __name__ == "__main__":
     # Quick sanity test: does the nominal pose stand without actions?
-    cfg = EnvConfig(xml_path="../assets/robot.xml")
+    cfg = EnvConfig(xml_path=str(Path(__file__).resolve().parents[1] / "assets" / "robot.xml"))
     env = WholeBodyReachEnv(cfg, render_mode=None)
 
     obs, info = env.reset(seed=0)

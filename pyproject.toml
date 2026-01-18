@@ -47,7 +47,9 @@ dev = [
     "ruff>=0.2",
     "pytest>=7.4",
 ]
+
 video = [
+    "opencv-python>=4.9",
     "imageio>=2.31",
     "imageio-ffmpeg>=0.4",
 ]
