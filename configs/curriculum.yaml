@@ -2,9 +2,9 @@
 # Progression uses success_rate over a sliding window.
 
 window_episodes: 100
-advance_threshold: 0.75   # success rate to advance
-regress_threshold: 0.20   # optional: if below, drop stage (can disable)
-allow_regress: false
+advance_threshold: 0.20   # success rate to advance
+regress_threshold: 0.05   # optional: if below, drop stage (can disable)
+allow_regress: True
 
 stages:
   - name: stage0_stand_easy_reach

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, List
@@ -115,6 +116,40 @@ class CurriculumCallback(BaseCallback):
 
         return True
 
+def find_latest_checkpoint(models_dir: Path, prefix: str = "ppo_wholebody") -> Path | None:
+    """
+    Returns the checkpoint with the highest '<steps>_steps' suffix.
+    Falls back to '<prefix>_final.zip' if present and no step checkpoints found.
+    """
+    if not models_dir.exists():
+        return None
+
+    # Match files like: ppo_wholebody_2800000_steps.zip
+    pat = re.compile(rf"^{re.escape(prefix)}_(\d+)_steps\.zip$")
+
+    best_path = None
+    best_steps = -1
+
+    for p in models_dir.iterdir():
+        if not p.is_file():
+            continue
+        m = pat.match(p.name)
+        if m:
+            steps = int(m.group(1))
+            if steps > best_steps:
+                best_steps = steps
+                best_path = p
+
+    if best_path is not None:
+        return best_path
+
+    final_path = models_dir / f"{prefix}_final.zip"
+    if final_path.exists():
+        return final_path
+
+    return None
+
+
 
 def main():
     root = Path(__file__).resolve().parent
@@ -144,24 +179,42 @@ def main():
     # Build PPO
     policy_kwargs = {"net_arch": ppo_cfg["policy_kwargs"]["net_arch"]}
 
-    model = PPO(
-        policy=ppo_cfg["ppo"]["policy"],
-        env=env,
-        n_steps=int(ppo_cfg["ppo"]["n_steps"]),
-        batch_size=int(ppo_cfg["ppo"]["batch_size"]),
-        n_epochs=int(ppo_cfg["ppo"]["n_epochs"]),
-        gamma=float(ppo_cfg["ppo"]["gamma"]),
-        gae_lambda=float(ppo_cfg["ppo"]["gae_lambda"]),
-        clip_range=float(ppo_cfg["ppo"]["clip_range"]),
-        ent_coef=float(ppo_cfg["ppo"]["ent_coef"]),
-        vf_coef=float(ppo_cfg["ppo"]["vf_coef"]),
-        max_grad_norm=float(ppo_cfg["ppo"]["max_grad_norm"]),
-        learning_rate=float(ppo_cfg["ppo"]["learning_rate"]),
-        policy_kwargs=policy_kwargs,
-        verbose=int(ppo_cfg["ppo"]["verbose"]),
-        tensorboard_log=str(root / ppo_cfg["train"]["tb_log_dir"]),
-        seed=seed,
-    )
+    models_dir = root / ppo_cfg["train"]["save_dir"]
+    models_dir.mkdir(parents=True, exist_ok=True)
+
+    ckpt = find_latest_checkpoint(models_dir, prefix="ppo_wholebody")
+
+    if ckpt is not None:
+        print(f"[resume] Loading checkpoint: {ckpt.name}")
+        model = PPO.load(
+            str(ckpt),
+            env=env,
+            tensorboard_log=str(root / ppo_cfg["train"]["tb_log_dir"]),
+            seed=seed,
+        )
+    else:
+        print("[resume] No checkpoint found, starting from scratch.")
+        policy_kwargs = {"net_arch": ppo_cfg["policy_kwargs"]["net_arch"]}
+
+        model = PPO(
+            policy=ppo_cfg["ppo"]["policy"],
+            env=env,
+            n_steps=int(ppo_cfg["ppo"]["n_steps"]),
+            batch_size=int(ppo_cfg["ppo"]["batch_size"]),
+            n_epochs=int(ppo_cfg["ppo"]["n_epochs"]),
+            gamma=float(ppo_cfg["ppo"]["gamma"]),
+            gae_lambda=float(ppo_cfg["ppo"]["gae_lambda"]),
+            clip_range=float(ppo_cfg["ppo"]["clip_range"]),
+            ent_coef=float(ppo_cfg["ppo"]["ent_coef"]),
+            vf_coef=float(ppo_cfg["ppo"]["vf_coef"]),
+            max_grad_norm=float(ppo_cfg["ppo"]["max_grad_norm"]),
+            learning_rate=float(ppo_cfg["ppo"]["learning_rate"]),
+            target_kl=float(ppo_cfg["ppo"]["target_kl"]),
+            policy_kwargs=policy_kwargs,
+            verbose=int(ppo_cfg["ppo"]["verbose"]),
+            tensorboard_log=str(root / ppo_cfg["train"]["tb_log_dir"]),
+            seed=seed,
+        )
 
     save_dir = root / ppo_cfg["train"]["save_dir"]
     save_dir.mkdir(parents=True, exist_ok=True)
