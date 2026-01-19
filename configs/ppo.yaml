@@ -1,7 +1,7 @@
 seed: 0
 
 train:
-  total_timesteps: 3000000
+  total_timesteps: 5000000
   log_interval: 10
   save_freq_steps: 200000
   save_dir: models

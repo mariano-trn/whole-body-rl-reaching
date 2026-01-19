@@ -54,9 +54,10 @@ class CurriculumManager:
             return False
 
         sr = self.success_rate()
+        adv_th = self.current_advance_threshold()
 
         # advance
-        if sr >= self.advance_th and self.stage_idx < len(self.stages) - 1:
+        if sr >= adv_th and self.stage_idx < len(self.stages) - 1:
             self.stage_idx += 1
             self.recent_success.clear()
             return True
@@ -68,6 +69,12 @@ class CurriculumManager:
             return True
 
         return False
+
+    def current_advance_threshold(self) -> float:
+        st = self.stage
+        if "advance_threshold" in st:
+            return float(st["advance_threshold"])
+        return self.advance_th
 
 
 class CurriculumCallback(BaseCallback):
@@ -172,9 +179,9 @@ def main():
         action_rate_limit=float(ppo_cfg["env"]["action_rate_limit"]),
     )
 
-    env = WholeBodyReachEnv(env_cfg, render_mode=None)
+    base_env  = WholeBodyReachEnv(env_cfg, render_mode=None)
     # Wrap with Monitor so SB3 logs episode returns/len
-    env = Monitor(env)
+    env = Monitor(base_env)
 
     # Build PPO
     policy_kwargs = {"net_arch": ppo_cfg["policy_kwargs"]["net_arch"]}
@@ -192,6 +199,10 @@ def main():
             tensorboard_log=str(root / ppo_cfg["train"]["tb_log_dir"]),
             seed=seed,
         )
+
+        # Enforce target_kl
+        model.target_kl = float(ppo_cfg["ppo"]["target_kl"])
+
     else:
         print("[resume] No checkpoint found, starting from scratch.")
         policy_kwargs = {"net_arch": ppo_cfg["policy_kwargs"]["net_arch"]}
@@ -229,7 +240,7 @@ def main():
 
     # Curriculum callback needs the underlying env instance (before Monitor wrap)
     # Monitor.env is the actual env
-    curriculum_cb = CurriculumCallback(env.env, cur_cfg, verbose=1)
+    curriculum_cb = CurriculumCallback(base_env, cur_cfg, verbose=1)
 
     total_timesteps = int(ppo_cfg["train"]["total_timesteps"])
     model.learn(

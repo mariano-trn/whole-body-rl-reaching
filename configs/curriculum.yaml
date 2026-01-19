@@ -2,12 +2,14 @@
 # Progression uses success_rate over a sliding window.
 
 window_episodes: 100
+# fallback if a stage does not specify its own threshold
 advance_threshold: 0.20   # success rate to advance
 regress_threshold: 0.05   # optional: if below, drop stage (can disable)
-allow_regress: True
+allow_regress: False
 
 stages:
   - name: stage0_stand_easy_reach
+    advance_threshold: 0.20
     target_x: [0.25, 0.45]
     target_y: [-0.08, 0.08]
     target_z: [0.90, 1.10]
@@ -19,6 +21,7 @@ stages:
       w_hold: 0.0
 
   - name: stage1_upper_body_workspace
+    advance_threshold: 0.20
     target_x: [0.25, 0.65]
     target_y: [-0.20, 0.20]
     target_z: [0.80, 1.20]
@@ -30,9 +33,10 @@ stages:
       w_hold: 0.0
 
   - name: stage2_wide_targets
+    advance_threshold: 0.20
     target_x: [0.20, 0.90]
     target_y: [-0.35, 0.35]
-    target_z: [0.70, 1.40]
+    target_z: [0.70, 1.30]
     reward:
       w_reach: 1.0
       w_alive: 0.05
@@ -41,6 +45,7 @@ stages:
       w_hold: 0.10
 
   - name: stage3_full_task
+    advance_threshold: 0.20
     target_x: [0.20, 0.90]
     target_y: [-0.35, 0.35]
     target_z: [0.70, 1.40]

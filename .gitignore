@@ -209,3 +209,8 @@ __marimo__/
 # TensorBoard / training artifacts
 runs/
 models/
+
+# Evaluation outputs
+docs/results.json
+docs/results.txt
+
